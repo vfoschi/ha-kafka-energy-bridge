@@ -1,8 +1,11 @@
 name: "Kafka Energy Bridge"
-version: "1.1.0"
+version: "1.1.1"
 slug: kafka_energy_bridge
 description: "Pubblica i consumi energetici (es. Sinapsi Alfa) su un topic Kafka."
-url: "https://github.com/alexdelprete/ha-sinapsi-alfa"
+url: "https://github.com/vfoschi/ha-kafka-energy-bridge"
+# NOTA: per usare immagini pre-buildate da GHCR (niente build locale), decommenta
+# la riga seguente DOPO che la GitHub Action ha pubblicato le immagini pubbliche:
+# image: "ghcr.io/vfoschi/kafka_energy_bridge-{arch}"
 arch:
   - aarch64
   - amd64
