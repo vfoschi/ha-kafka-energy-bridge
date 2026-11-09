@@ -1,5 +1,5 @@
 name: "Kafka Energy Bridge"
-version: "1.2.0"
+version: "1.3.0"
 slug: kafka_energy_bridge
 description: "Pubblica i consumi energetici (es. Sinapsi Alfa) su un topic Kafka."
 url: "https://github.com/vfoschi/ha-kafka-energy-bridge"
@@ -27,12 +27,29 @@ options:
     - sensor.alfa_potenza_prodotta
     - sensor.alfa_potenza_consumata
     - sensor.alfa_energia_prelevata
+    - sensor.alfa_energia_immessa
     - sensor.alfa_energia_prodotta
+    - sensor.alfa_energia_consumata
+    - sensor.alfa_fascia_oraria_attuale
+    # --- Fasce F1-F6 (disabilitate di default nell'integration: abilitale prima!) ---
+    # - sensor.alfa_energia_prelevata_giornaliera_f1
+    # - sensor.alfa_energia_prelevata_giornaliera_f2
+    # - sensor.alfa_energia_prelevata_giornaliera_f3
+    # - sensor.alfa_energia_immessa_giornaliera_f1
+    # - sensor.alfa_energia_immessa_giornaliera_f2
+    # - sensor.alfa_energia_immessa_giornaliera_f3
   # Sensori CUMULATIVI (kWh) per cui pubblicare anche il DELTA di consumo
   # nell'intervallo. Funziona solo in publish_mode=snapshot.
+  # NB: i sensori per fascia sono giornalieri (si azzerano a mezzanotte): il
+  # delta gestisce l'azzeramento saltando il valore sceso, nessun dato sporco.
   cumulative_sensors:
     - sensor.alfa_energia_prelevata
+    - sensor.alfa_energia_immessa
     - sensor.alfa_energia_prodotta
+    - sensor.alfa_energia_consumata
+    # - sensor.alfa_energia_prelevata_giornaliera_f1
+    # - sensor.alfa_energia_prelevata_giornaliera_f2
+    # - sensor.alfa_energia_prelevata_giornaliera_f3
   # --- Sicurezza Kafka (lascia security_protocol="PLAINTEXT" se non serve) ---
   security_protocol: "PLAINTEXT"   # PLAINTEXT | SASL_PLAINTEXT | SASL_SSL | SSL
   sasl_mechanism: "PLAIN"          # PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512

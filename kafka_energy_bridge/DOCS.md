@@ -41,14 +41,28 @@ aggiornare l'integration liberamente; il bridge resta indipendente.
 
 Gli `entity_id` di default assumono device name `alfa`. **Verifica i tuoi reali**
 in *Developer Tools → States* cercando `potenza` o `energia`, e aggiorna la lista.
-Sensori tipici dell'integration Alfa:
+Sensori dell'integration Alfa (nomi reali dal `const.py`):
 
-- `sensor.alfa_potenza_prelevata` — potenza prelevata dalla rete
-- `sensor.alfa_potenza_immessa` — potenza immessa in rete (FV)
-- `sensor.alfa_potenza_prodotta` — produzione fotovoltaica
-- `sensor.alfa_potenza_consumata` — consumo totale casa
-- `sensor.alfa_energia_prelevata` — energia prelevata (cumulativa, kWh)
-- `sensor.alfa_energia_prodotta` — energia prodotta (cumulativa, kWh)
+**Potenze istantanee (kW)** — vanno in `sensors`, NON in `cumulative_sensors`:
+- `sensor.alfa_potenza_prelevata`, `sensor.alfa_potenza_immessa`
+- `sensor.alfa_potenza_prodotta`, `sensor.alfa_potenza_consumata`
+- `sensor.alfa_potenza_auto_consumata`
+
+**Energie cumulative (kWh, lifetime)** — adatte al delta:
+- `sensor.alfa_energia_prelevata`, `sensor.alfa_energia_immessa`
+- `sensor.alfa_energia_prodotta`, `sensor.alfa_energia_consumata`
+- `sensor.alfa_energia_auto_consumata`
+
+**Energie per fascia F1-F6 (giornaliere)** — prelievo e immissione:
+- `sensor.alfa_energia_prelevata_giornaliera_f1` … `_f6`
+- `sensor.alfa_energia_immessa_giornaliera_f1` … `_f6`
+
+> ⚠️ **Le fasce F1-F6 sono DISABILITATE di default** nell'integration. Per usarle:
+> *Settings → Devices & Services → Alfa by Sinapsi → entità* → abilita quelle F1-F6
+> che ti servono, poi aggiungile a `sensors` (e a `cumulative_sensors` per il delta).
+> Sono **giornaliere**: si azzerano a mezzanotte, e il delta gestisce l'azzeramento.
+
+**Altri:** `sensor.alfa_fascia_oraria_attuale` (fascia corrente F1-F6, testo).
 
 ## Formato dei messaggi
 
