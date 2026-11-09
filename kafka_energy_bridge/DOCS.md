@@ -81,7 +81,7 @@ Sensori tipici dell'integration Alfa:
   (nessuna password da configurare lato HA).
 - In modalità `event` si sottoscrive a `state_changed` e filtra la lista `sensors`.
 - In modalità `snapshot` interroga `get_states` ogni `snapshot_interval` secondi.
-- Pubblica con client Kafka nativo (`confluent-kafka`), con supporto SASL/TLS,
+- Pubblica con client Kafka nativo (`kafka-python`), con supporto SASL/TLS,
   idempotenza e riconnessione automatica.
 
 ## Troubleshooting

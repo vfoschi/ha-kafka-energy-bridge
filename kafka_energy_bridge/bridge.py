@@ -11,6 +11,8 @@ Due modalita':
 
 Tutti i parametri arrivano da variabili d'ambiente impostate da run.sh,
 che a sua volta le legge dalle opzioni dell'add-on (configurabili dalla UI di HA).
+
+Usa kafka-python (puro Python) per evitare la compilazione di librdkafka.
 """
 
 import os
@@ -22,7 +24,8 @@ import asyncio
 import logging
 
 import websockets
-from confluent_kafka import Producer
+from kafka import KafkaProducer
+from kafka.errors import KafkaError
 
 # --------------------------------------------------------------------------- #
 # Configurazione da ambiente
@@ -57,44 +60,52 @@ log = logging.getLogger("kafka-energy-bridge")
 # --------------------------------------------------------------------------- #
 # Producer Kafka
 # --------------------------------------------------------------------------- #
-def build_producer() -> Producer:
+def build_producer() -> KafkaProducer:
+    bootstrap = [b.strip() for b in KAFKA_BOOTSTRAP.split(",") if b.strip()]
     conf = {
-        "bootstrap.servers": KAFKA_BOOTSTRAP,
-        "security.protocol": SECURITY_PROTOCOL,
-        "client.id": "ha-kafka-energy-bridge",
-        "enable.idempotence": True,
+        "bootstrap_servers": bootstrap,
+        "client_id": "ha-kafka-energy-bridge",
+        "security_protocol": SECURITY_PROTOCOL,
+        "acks": "all",
+        "retries": 5,
+        "value_serializer": lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
+        "key_serializer": lambda k: k.encode("utf-8") if isinstance(k, str) else k,
     }
     if SECURITY_PROTOCOL in ("SASL_PLAINTEXT", "SASL_SSL"):
-        conf["sasl.mechanisms"] = SASL_MECHANISM
-        conf["sasl.username"] = SASL_USERNAME
-        conf["sasl.password"] = SASL_PASSWORD
-    log.info("Kafka producer: %s (%s)", KAFKA_BOOTSTRAP, SECURITY_PROTOCOL)
-    return Producer(conf)
+        conf["sasl_mechanism"] = SASL_MECHANISM
+        conf["sasl_plain_username"] = SASL_USERNAME
+        conf["sasl_plain_password"] = SASL_PASSWORD
+    log.info("Kafka producer: %s (%s)", bootstrap, SECURITY_PROTOCOL)
+    return KafkaProducer(**conf)
 
 
-producer = build_producer()
+def get_producer() -> KafkaProducer:
+    """Crea il producer con retry: non fa crashare l'add-on se Kafka non e' ancora pronto."""
+    global producer
+    while _running:
+        try:
+            producer = build_producer()
+            return producer
+        except KafkaError as exc:
+            log.error("Kafka non raggiungibile (%s): nuovo tentativo tra 10s", exc)
+            time.sleep(10)
+    return None
+
+
+producer = None
 _running = True
 
 
-def _delivery(err, msg):
-    if err is not None:
-        log.error("Delivery fallita %s: %s", msg.key(), err)
-    else:
-        log.debug("Consegnato %s -> %s[%d]", msg.key(), msg.topic(), msg.partition())
-
-
 def publish(key: str, value: dict) -> None:
+    if producer is None:
+        log.warning("Producer non pronto, messaggio %s scartato", key)
+        return
     try:
-        producer.produce(
-            KAFKA_TOPIC,
-            key=key,
-            value=json.dumps(value, ensure_ascii=False),
-            callback=_delivery,
-        )
-        producer.poll(0)
-    except BufferError:
-        log.warning("Coda producer piena, flush forzato")
-        producer.flush(5)
+        future = producer.send(KAFKA_TOPIC, key=key, value=value)
+        future.add_errback(lambda e: log.error("Delivery fallita %s: %s", key, e))
+        log.debug("Inviato %s -> %s", key, KAFKA_TOPIC)
+    except KafkaError as exc:
+        log.error("Errore invio Kafka %s: %s", key, exc)
 
 
 # --------------------------------------------------------------------------- #
@@ -197,7 +208,11 @@ def _handle_sigterm(*_):
     global _running
     log.info("Arresto richiesto, flush producer...")
     _running = False
-    producer.flush(10)
+    try:
+        producer.flush(10)
+        producer.close(10)
+    except Exception:  # noqa: BLE001
+        pass
     sys.exit(0)
 
 
@@ -208,6 +223,8 @@ def main():
     if not SENSORS:
         log.error("Nessun sensore configurato nell'opzione 'sensors'. Esco.")
         sys.exit(1)
+
+    get_producer()  # attende che Kafka sia raggiungibile prima di partire
 
     if PUBLISH_MODE == "snapshot":
         asyncio.run(run_snapshot_mode())

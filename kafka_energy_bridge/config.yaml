@@ -1,5 +1,5 @@
 name: "Kafka Energy Bridge"
-version: "1.0.0"
+version: "1.1.0"
 slug: kafka_energy_bridge
 description: "Pubblica i consumi energetici (es. Sinapsi Alfa) su un topic Kafka."
 url: "https://github.com/alexdelprete/ha-sinapsi-alfa"
