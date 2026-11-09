@@ -1,5 +1,5 @@
 name: "Kafka Energy Bridge"
-version: "1.1.1"
+version: "1.2.0"
 slug: kafka_energy_bridge
 description: "Pubblica i consumi energetici (es. Sinapsi Alfa) su un topic Kafka."
 url: "https://github.com/vfoschi/ha-kafka-energy-bridge"
@@ -28,6 +28,11 @@ options:
     - sensor.alfa_potenza_consumata
     - sensor.alfa_energia_prelevata
     - sensor.alfa_energia_prodotta
+  # Sensori CUMULATIVI (kWh) per cui pubblicare anche il DELTA di consumo
+  # nell'intervallo. Funziona solo in publish_mode=snapshot.
+  cumulative_sensors:
+    - sensor.alfa_energia_prelevata
+    - sensor.alfa_energia_prodotta
   # --- Sicurezza Kafka (lascia security_protocol="PLAINTEXT" se non serve) ---
   security_protocol: "PLAINTEXT"   # PLAINTEXT | SASL_PLAINTEXT | SASL_SSL | SSL
   sasl_mechanism: "PLAIN"          # PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512
@@ -40,6 +45,8 @@ schema:
   publish_mode: "list(event|snapshot)"
   snapshot_interval: "int(5,3600)"
   sensors:
+    - "str"
+  cumulative_sensors:
     - "str"
   security_protocol: "list(PLAINTEXT|SASL_PLAINTEXT|SASL_SSL|SSL)"
   sasl_mechanism: "list(PLAIN|SCRAM-SHA-256|SCRAM-SHA-512)"

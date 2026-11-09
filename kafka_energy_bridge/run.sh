@@ -14,6 +14,7 @@ export LOG_LEVEL="$(bashio::config 'log_level')"
 
 # Lista sensori -> stringa separata da virgole
 export SENSORS="$(bashio::config 'sensors | join(",")')"
+export CUMULATIVE_SENSORS="$(bashio::config 'cumulative_sensors | join(",")')"
 
 # Token e URL interni del Supervisor per l'API WebSocket di Home Assistant
 export HA_TOKEN="${SUPERVISOR_TOKEN}"

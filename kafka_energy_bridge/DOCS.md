@@ -30,6 +30,7 @@ aggiornare l'integration liberamente; il bridge resta indipendente.
 | `publish_mode` | `event` (un msg per cambio sensore) o `snapshot` (tutti i valori periodicamente) | `event` |
 | `snapshot_interval` | secondi tra snapshot (solo modalità snapshot) | `60` |
 | `sensors` | lista degli `entity_id` da pubblicare | vedi nota |
+| `cumulative_sensors` | sottoinsieme di `sensors` (le energie kWh) per cui pubblicare anche il **delta** di consumo nell'intervallo (solo in modalità snapshot) | vedi nota |
 | `security_protocol` | `PLAINTEXT` / `SASL_PLAINTEXT` / `SASL_SSL` / `SSL` | `PLAINTEXT` |
 | `sasl_mechanism` | `PLAIN` / `SCRAM-SHA-256` / `SCRAM-SHA-512` | `PLAIN` |
 | `sasl_username` | utente SASL (se autenticazione attiva) | |
@@ -63,7 +64,8 @@ Sensori tipici dell'integration Alfa:
 }
 ```
 
-**Modalità `snapshot`** — key = `snapshot`:
+**Modalità `snapshot`** — key = `snapshot`. Include `values` (valori assoluti) e
+`deltas` (consumo nell'intervallo per i sensori cumulativi):
 
 ```json
 {
@@ -71,9 +73,31 @@ Sensori tipici dell'integration Alfa:
   "values": {
     "sensor.alfa_potenza_prelevata": { "state": "1.234", "unit": "kW", ... },
     "sensor.alfa_energia_prelevata": { "state": "4567.8", "unit": "kWh", ... }
+  },
+  "deltas": {
+    "sensor.alfa_energia_prelevata": {
+      "delta": 0.021,            // consumo NELL'INTERVALLO (kWh)
+      "current": 4567.8,         // lettura attuale
+      "previous": 4567.779,      // lettura precedente
+      "elapsed_seconds": 60.0,   // durata effettiva dell'intervallo
+      "unit": "kWh"
+    }
   }
 }
 ```
+
+### Delta di consumo nell'intervallo
+
+Per i sensori elencati in `cumulative_sensors` (le energie kWh, che salgono sempre),
+l'add-on pubblica il **delta** = quanto è stato consumato tra uno snapshot e il
+successivo, oltre al valore assoluto. Note:
+
+- Funziona **solo in `publish_mode: snapshot`** (serve il polling regolare).
+- Il **primo** snapshot dopo l'avvio non ha delta (manca il riferimento).
+- Se il valore **scende** (contatore azzerato o riavvio HA) il delta viene saltato,
+  così non finiscono valori negativi sul topic.
+- Le **potenze** (kW, istantanee) vanno in `sensors` ma **non** in `cumulative_sensors`:
+  per loro il delta non ha senso.
 
 ## Come funziona
 

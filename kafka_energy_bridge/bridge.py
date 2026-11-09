@@ -15,6 +15,8 @@ che a sua volta le legge dalle opzioni dell'add-on (configurabili dalla UI di HA
 Usa kafka-python (puro Python) per evitare la compilazione di librdkafka.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import json
@@ -50,6 +52,17 @@ SENSORS = {
     for s in os.environ.get("SENSORS", "").split(",")
     if s.strip()
 }
+
+# Sensori cumulativi (es. energia kWh che sale sempre) per cui pubblicare
+# anche il DELTA di consumo nell'intervallo tra uno snapshot e il successivo.
+CUMULATIVE_SENSORS = {
+    s.strip()
+    for s in os.environ.get("CUMULATIVE_SENSORS", "").split(",")
+    if s.strip()
+}
+
+# Stato in memoria dell'ultima lettura cumulativa: {entity_id: (valore, timestamp_epoch)}
+_last_cumulative: dict = {}
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -141,6 +154,51 @@ def state_payload(state: dict) -> dict:
     }
 
 
+def compute_delta(eid: str, state: dict) -> dict | None:
+    """Calcola il delta di consumo per un sensore cumulativo rispetto all'ultima lettura.
+
+    Ritorna un dict con delta/valore/intervallo, oppure None se:
+      - e' il primo campione (nessun riferimento precedente),
+      - il valore non e' numerico,
+      - il valore e' sceso (reset contatore o riavvio) -> si riparte dal nuovo campione.
+    """
+    raw = state.get("state")
+    try:
+        current = float(raw)
+    except (TypeError, ValueError):
+        return None  # unavailable / unknown / non numerico
+
+    now = time.time()
+    prev = _last_cumulative.get(eid)
+    _last_cumulative[eid] = (current, now)
+
+    if prev is None:
+        log.debug("Delta %s: primo campione (%.3f), salto", eid, current)
+        return None
+
+    prev_val, prev_ts = prev
+    delta = current - prev_val
+    elapsed = now - prev_ts
+
+    if delta < 0:
+        # Contatore azzerato o riavvio: non pubblico un delta negativo, riparto.
+        log.warning("Delta %s negativo (%.3f -> %.3f): reset, salto questo intervallo",
+                    eid, prev_val, current)
+        return None
+
+    attrs = state.get("attributes", {})
+    return {
+        "entity_id": eid,
+        "delta": round(delta, 6),
+        "current": current,
+        "previous": prev_val,
+        "elapsed_seconds": round(elapsed, 1),
+        "unit": attrs.get("unit_of_measurement"),
+        "friendly_name": attrs.get("friendly_name"),
+        "last_updated": state.get("last_updated"),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Modalita' EVENT
 # --------------------------------------------------------------------------- #
@@ -185,14 +243,23 @@ async def run_snapshot_mode():
                 snap = {
                     "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                     "values": {},
+                    "deltas": {},
                 }
                 for eid in SENSORS:
                     st = states.get(eid)
                     if st:
                         snap["values"][eid] = state_payload(st)
-                if snap["values"]:
+                # Delta di consumo nell'intervallo per i sensori cumulativi
+                for eid in CUMULATIVE_SENSORS:
+                    st = states.get(eid)
+                    if st:
+                        d = compute_delta(eid, st)
+                        if d is not None:
+                            snap["deltas"][eid] = d
+                if snap["values"] or snap["deltas"]:
                     publish("snapshot", snap)
-                    log.debug("Snapshot pubblicato (%d valori)", len(snap["values"]))
+                    log.debug("Snapshot pubblicato (%d valori, %d delta)",
+                              len(snap["values"]), len(snap["deltas"]))
                 else:
                     log.warning("Nessun sensore trovato per lo snapshot")
                 await asyncio.sleep(SNAPSHOT_INTERVAL)
