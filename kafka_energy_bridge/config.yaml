@@ -1,0 +1,45 @@
+name: "Kafka Energy Bridge"
+version: "1.0.0"
+slug: kafka_energy_bridge
+description: "Pubblica i consumi energetici (es. Sinapsi Alfa) su un topic Kafka."
+url: "https://github.com/alexdelprete/ha-sinapsi-alfa"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+hassio_api: true
+homeassistant_api: true
+# L'add-on usa il token Supervisor per leggere gli stati via WebSocket interno.
+options:
+  kafka_bootstrap: "kafka:9092"
+  kafka_topic: "consumi-enel"
+  # Modalità di pubblicazione: "event" = un messaggio per ogni cambio di sensore,
+  #                            "snapshot" = un messaggio periodico con tutti i valori insieme
+  publish_mode: "event"
+  snapshot_interval: 60
+  sensors:
+    - sensor.alfa_potenza_prelevata
+    - sensor.alfa_potenza_immessa
+    - sensor.alfa_potenza_prodotta
+    - sensor.alfa_potenza_consumata
+    - sensor.alfa_energia_prelevata
+    - sensor.alfa_energia_prodotta
+  # --- Sicurezza Kafka (lascia security_protocol="PLAINTEXT" se non serve) ---
+  security_protocol: "PLAINTEXT"   # PLAINTEXT | SASL_PLAINTEXT | SASL_SSL | SSL
+  sasl_mechanism: "PLAIN"          # PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512
+  sasl_username: ""
+  sasl_password: ""
+  log_level: "info"
+schema:
+  kafka_bootstrap: "str"
+  kafka_topic: "str"
+  publish_mode: "list(event|snapshot)"
+  snapshot_interval: "int(5,3600)"
+  sensors:
+    - "str"
+  security_protocol: "list(PLAINTEXT|SASL_PLAINTEXT|SASL_SSL|SSL)"
+  sasl_mechanism: "list(PLAIN|SCRAM-SHA-256|SCRAM-SHA-512)"
+  sasl_username: "str?"
+  sasl_password: "password?"
+  log_level: "list(debug|info|warning|error)"
